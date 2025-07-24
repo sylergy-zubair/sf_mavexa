@@ -48,113 +48,15 @@ let accessToken = null;
 let instanceUrl = null;
 let refreshToken = null;
 
-// Serve the HTML files
+// Serve the OAuth HTML page
 app.get('/', (req, res) => {
-    const useOAuth = process.env.USE_OAUTH === 'true';
-    const htmlFile = useOAuth ? 'salesforce-oauth.html' : 'salesforce-test-proxy.html';
-    res.sendFile(path.join(__dirname, htmlFile));
+    res.sendFile(path.join(__dirname, 'salesforce-oauth.html'));
 });
 
 app.get('/oauth', (req, res) => {
     res.sendFile(path.join(__dirname, 'salesforce-oauth.html'));
 });
 
-app.get('/password', (req, res) => {
-    res.sendFile(path.join(__dirname, 'salesforce-test-proxy.html'));
-});
-
-// Salesforce authentication endpoint
-app.post('/api/sf/authenticate', async (req, res) => {
-    try {
-        const { instanceUrl: sfInstanceUrl, clientId, clientSecret, username, password } = req.body;
-
-        // Enhanced logging (without sensitive data)
-        console.log('\n=== Salesforce Authentication Attempt ===');
-        console.log('Instance URL:', sfInstanceUrl);
-        console.log('Client ID:', clientId ? `${clientId.substring(0, 10)}...` : 'MISSING');
-        console.log('Client Secret:', clientSecret ? 'PROVIDED' : 'MISSING');
-        console.log('Username:', username);
-        console.log('Password Length:', password ? password.length : 'MISSING');
-
-        const authUrl = `${sfInstanceUrl}/services/oauth2/token`;
-        console.log('Auth URL:', authUrl);
-
-        const authBody = new URLSearchParams({
-            grant_type: 'password',
-            client_id: clientId,
-            client_secret: clientSecret,
-            username: username,
-            password: password
-        });
-
-        console.log('Request body keys:', Array.from(authBody.keys()));
-
-        const response = await fetch(authUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: authBody
-        });
-
-        console.log('Response Status:', response.status);
-        console.log('Response Headers:', Object.fromEntries(response.headers.entries()));
-
-        const data = await response.json();
-        console.log('Salesforce Response:', JSON.stringify(data, null, 2));
-
-        if (response.ok) {
-            accessToken = data.access_token;
-            instanceUrl = data.instance_url;
-            
-            console.log('✅ Authentication successful!');
-            res.json({
-                success: true,
-                message: 'Successfully connected to Salesforce!',
-                instanceUrl: instanceUrl,
-                tokenType: data.token_type
-            });
-        } else {
-            console.log('❌ Authentication failed:', data);
-            
-            // Enhanced error messages
-            let errorMessage = data.error_description || data.error || 'Authentication failed';
-            let troubleshooting = '';
-
-            switch (data.error) {
-                case 'invalid_client_id':
-                    troubleshooting = 'Check your Consumer Key in the Connected App';
-                    break;
-                case 'invalid_client':
-                    troubleshooting = 'Check your Consumer Secret in the Connected App';
-                    break;
-                case 'invalid_grant':
-                    troubleshooting = 'Check username/password. Make sure security token is appended to password';
-                    break;
-                case 'unsupported_grant_type':
-                    troubleshooting = 'Enable "Password Flow" in your Connected App OAuth settings';
-                    break;
-                default:
-                    troubleshooting = 'Check all credentials and Connected App configuration';
-            }
-
-            res.status(400).json({
-                success: false,
-                error: errorMessage,
-                errorCode: data.error,
-                troubleshooting: troubleshooting,
-                fullResponse: data
-            });
-        }
-    } catch (error) {
-        console.log('🔥 Network/Server Error:', error.message);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            troubleshooting: 'Check if Salesforce instance URL is correct and accessible'
-        });
-    }
-});
 
 // =============================================================================
 // OAuth 2.0 Authorization Code Flow Endpoints
