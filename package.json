@@ -1,0 +1,23 @@
+{
+  "name": "salesforce-api-test",
+  "version": "1.0.0",
+  "description": "Simple Salesforce API test tool with proxy server",
+  "main": "salesforce-proxy.js",
+  "scripts": {
+    "start": "node salesforce-proxy.js",
+    "dev": "node salesforce-proxy.js"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.54.1",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
+  },
+  "keywords": [
+    "salesforce",
+    "api",
+    "test"
+  ],
+  "author": "",
+  "license": "MIT"
+}
