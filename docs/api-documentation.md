@@ -23,11 +23,75 @@ Content-Type: application/json
 
 ## Authentication Endpoints
 
-### 1. Username/Password Flow
+### 1. OAuth 2.0 Authorization Code Flow (Recommended)
+
+#### 1.1 Initiate OAuth Flow
+```http
+GET /api/sf/auth/login
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "authUrl": "https://login.salesforce.com/services/oauth2/authorize?...",
+  "message": "Redirect user to this URL for authentication"
+}
+```
+
+#### 1.2 OAuth Callback (Handled Automatically)
+```http
+GET /api/sf/auth/callback?code=...&state=...
+```
+
+**Success:** Redirects to `/?auth=success`
+**Error:** Redirects to `/?error=error_description`
+
+#### 1.3 Token Refresh
+```http
+POST /api/sf/auth/refresh
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully"
+}
+```
+
+#### 1.4 Authentication Status
+```http
+GET /api/sf/auth/status
+```
+
+**Response:**
+```json
+{
+  "authenticated": true,
+  "hasRefreshToken": true,
+  "instanceUrl": "https://xxx.my.salesforce.com"
+}
+```
+
+#### 1.5 Logout
+```http
+POST /api/sf/auth/logout
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+### 2. Username/Password Flow (Legacy)
 
 #### Request
 ```http
-POST /api/sf/auth/username-password
+POST /api/sf/authenticate
 Content-Type: application/json
 
 {
@@ -45,8 +109,8 @@ HTTP/1.1 200 OK
 Content-Type: application/json
 
 {
-  "accessToken": "00D...",
-  "refreshToken": "5Aep...",
+  "success": true,
+  "message": "Successfully connected to Salesforce!",
   "instanceUrl": "https://xxx.my.salesforce.com",
   "expiresIn": 3600,
   "tokenType": "Bearer",

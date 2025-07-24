@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesforce API Test (OAuth)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #1976d2;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .auth-method {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            padding: 30px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #1976d2;
+            padding-bottom: 5px;
+        }
+
+        .oauth-info {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .oauth-info strong {
+            color: #2e7d32;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .status.connected {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+
+        .status.disconnected {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="url"],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #1976d2;
+            box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+        }
+
+        button {
+            background: #1976d2;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #1565c0;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #666;
+        }
+
+        button.secondary:hover {
+            background: #555;
+        }
+
+        button.danger {
+            background: #d32f2f;
+        }
+
+        button.danger:hover {
+            background: #c62828;
+        }
+
+        .loading {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .auth-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .feature-comparison {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .comparison-table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .check {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .cross {
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Salesforce API Test Tool</h1>
+            <div class="auth-method">🔐 OAuth 2.0 Authorization Code Flow</div>
+        </div>
+
+        <div class="content">
+            <!-- OAuth Authentication -->
+            <div class="card">
+                <h3>OAuth Authentication</h3>
+                
+                <div class="oauth-info">
+                    <strong>🔐 Secure OAuth Flow</strong><br>
+                    Authentication via Salesforce login page - your credentials never pass through this application.
+                </div>
+
+                <div class="feature-comparison">
+                    <strong>OAuth vs Password Flow Comparison:</strong>
+                    <table class="comparison-table">
+                        <tr>
+                            <th>Feature</th>
+                            <th>OAuth</th>
+                            <th>Password</th>
+                        </tr>
+                        <tr>
+                            <td>Security</td>
+                            <td class="check">✓ High</td>
+                            <td class="cross">✗ Medium</td>
+                        </tr>
+                        <tr>
+                            <td>User Experience</td>
+                            <td class="check">✓ Standard</td>
+                            <td class="cross">✗ Custom</td>
+                        </tr>
+                        <tr>
+                            <td>Refresh Tokens</td>
+                            <td class="check">✓ Yes</td>
+                            <td class="cross">✗ No</td>
+                        </tr>
+                        <tr>
+                            <td>Production Ready</td>
+                            <td class="check">✓ Yes</td>
+                            <td class="cross">✗ Limited</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div id="connectionStatus" class="status disconnected">
+                    Status: Disconnected
+                </div>
+
+                <div class="auth-buttons">
+                    <button id="oauthLoginBtn" type="button">
+                        <span id="oauthSpinner" class="loading hidden"></span>
+                        🚀 Login with Salesforce
+                    </button>
+                    
+                    <button id="refreshTokenBtn" type="button" class="secondary" disabled>
+                        <span id="refreshSpinner" class="loading hidden"></span>
+                        🔄 Refresh Token
+                    </button>
+                    
+                    <button id="statusBtn" type="button" class="secondary">
+                        <span id="statusSpinner" class="loading hidden"></span>
+                        📊 Check Status
+                    </button>
+                    
+                    <button id="logoutBtn" type="button" class="danger" disabled>
+                        🔓 Logout
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <button id="switchToPasswordBtn" type="button" class="secondary">
+                        🔄 Switch to Password Flow
+                    </button>
+                </div>
+            </div>
+
+            <!-- OAuth Status & Results -->
+            <div class="card">
+                <h3>OAuth Status</h3>
+
+                <!-- Results Display -->
+                <div class="results" id="results">
+                    <strong>🚀 OAuth Implementation Active</strong><br>
+                    Click "Login with Salesforce" to start the OAuth flow.<br><br>
+                    Authentication status and results will appear here...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/sf';
+        let isConnected = false;
+
+        // DOM elements
+        const connectionStatus = document.getElementById('connectionStatus');
+        const results = document.getElementById('results');
+        
+        // Buttons
+        const oauthLoginBtn = document.getElementById('oauthLoginBtn');
+        const refreshTokenBtn = document.getElementById('refreshTokenBtn');
+        const statusBtn = document.getElementById('statusBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const switchToPasswordBtn = document.getElementById('switchToPasswordBtn');
+        
+        // Spinners
+        const oauthSpinner = document.getElementById('oauthSpinner');
+        const refreshSpinner = document.getElementById('refreshSpinner');
+        const statusSpinner = document.getElementById('statusSpinner');
+
+        // Helper function to show/hide loading
+        function showLoading(spinner, button) {
+            spinner.classList.remove('hidden');
+            button.disabled = true;
+        }
+
+        function hideLoading(spinner, button) {
+            spinner.classList.add('hidden');
+            button.disabled = false;
+        }
+
+        // Helper function to display results
+        function displayResult(data, success = true) {
+            const timestamp = new Date().toLocaleTimeString();
+            const status = success ? '✅ SUCCESS' : '❌ ERROR';
+            
+            // Handle manual link for fallback OAuth redirect
+            let resultContent = JSON.stringify(data, null, 2);
+            if (data.manualLink) {
+                resultContent = resultContent.replace(
+                    `"manualLink": "${data.manualLink}"`,
+                    `"manualLink": "<a href='${data.manualLink}' target='_blank' style='color: #1976d2; text-decoration: underline;'>🔗 Click here to login to Salesforce manually</a>"`
+                );
+            }
+            
+            const resultHtml = `<strong>[${timestamp}] ${status}:</strong><br><pre>${resultContent}</pre><br>`;
+            results.innerHTML = resultHtml + results.innerHTML;
+        }
+
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            if (connected) {
+                connectionStatus.textContent = '✅ Status: Connected (OAuth)';
+                connectionStatus.className = 'status connected';
+                refreshTokenBtn.disabled = false;
+                logoutBtn.disabled = false;
+            } else {
+                connectionStatus.textContent = '❌ Status: Disconnected';
+                connectionStatus.className = 'status disconnected';
+                refreshTokenBtn.disabled = true;
+                logoutBtn.disabled = true;
+            }
+        }
+
+        // OAuth Login
+        oauthLoginBtn.addEventListener('click', async () => {
+            console.log('🚀 OAuth Login Button Clicked');
+            showLoading(oauthSpinner, oauthLoginBtn);
+            
+            try {
+                console.log('📡 Fetching OAuth login URL from server...');
+                const response = await fetch(`${API_BASE}/auth/login`);
+                console.log('📨 Server response status:', response.status);
+                console.log('📨 Server response headers:', Object.fromEntries(response.headers.entries()));
+                
+                const data = await response.json();
+                console.log('📋 Server response data:', JSON.stringify(data, null, 2));
+                
+                if (data.success) {
+                    console.log('✅ OAuth URL received successfully');
+                    console.log('🔗 OAuth URL:', data.authUrl);
+                    
+                    displayResult({
+                        message: 'Redirecting to Salesforce for authentication...',
+                        authUrl: data.authUrl
+                    });
+                    
+                    // Enhanced redirect with multiple fallback methods
+                    console.log('🌐 Attempting browser redirect to Salesforce...');
+                    
+                    // Method 1: Direct window.location.href
+                    try {
+                        console.log('🔄 Method 1: Using window.location.href');
+                        window.location.href = data.authUrl;
+                        
+                        // Wait 2 seconds and check if redirect happened
+                        setTimeout(() => {
+                            if (window.location.href.includes('localhost')) {
+                                console.warn('⚠️ Method 1 failed - trying form submission method');
+                                
+                                // Method 2: Form submission redirect
+                                console.log('🔄 Method 2: Using form submission');
+                                try {
+                                    const form = document.createElement('form');
+                                    form.method = 'GET';
+                                    form.action = data.authUrl;
+                                    form.style.display = 'none';
+                                    document.body.appendChild(form);
+                                    form.submit();
+                                    
+                                    // Wait another 2 seconds
+                                    setTimeout(() => {
+                                        if (window.location.href.includes('localhost')) {
+                                            console.warn('⚠️ Method 2 also failed - showing manual link');
+                                            // Method 3: Manual link fallback
+                                            displayResult({
+                                                error: 'Automatic redirect failed',
+                                                troubleshooting: 'Browser may be blocking redirects. Click the link below to login manually',
+                                                manualLink: data.authUrl
+                                            }, false);
+                                            hideLoading(oauthSpinner, oauthLoginBtn);
+                                        }
+                                    }, 2000);
+                                    
+                                } catch (formError) {
+                                    console.error('❌ Form submission failed:', formError);
+                                    // Method 3: Manual link fallback
+                                    displayResult({
+                                        error: 'All automatic redirect methods failed',
+                                        troubleshooting: 'Click the link below to login manually',
+                                        manualLink: data.authUrl
+                                    }, false);
+                                    hideLoading(oauthSpinner, oauthLoginBtn);
+                                }
+                            }
+                        }, 2000);
+                        
+                    } catch (redirectError) {
+                        console.error('❌ Method 1 redirect failed:', redirectError);
+                        console.log('🔄 Method 2: Trying form submission as backup');
+                        
+                        // Method 2: Form submission redirect (immediate fallback)
+                        try {
+                            const form = document.createElement('form');
+                            form.method = 'GET';
+                            form.action = data.authUrl;
+                            form.style.display = 'none';
+                            document.body.appendChild(form);
+                            form.submit();
+                        } catch (formError) {
+                            console.error('❌ Form submission also failed:', formError);
+                            throw new Error(`All redirect methods failed: ${redirectError.message}`);
+                        }
+                    }
+                    
+                } else {
+                    console.error('❌ Server returned error:', data.error);
+                    console.error('📋 Full server response:', data);
+                    
+                    // Handle Connected App configuration errors specifically
+                    if (data.error && data.error.includes('not configured for OAuth')) {
+                        console.error('🚨 CONNECTED APP CONFIGURATION ERROR DETECTED');
+                        displayResult({
+                            error: data.error,
+                            troubleshooting: data.troubleshooting || [],
+                            authUrl: data.authUrl,
+                            solution: 'Enable Web Server Flow in your Connected App OAuth Settings'
+                        }, false);
+                        hideLoading(oauthSpinner, oauthLoginBtn);
+                        return;
+                    }
+                    
+                    throw new Error(data.error || 'Failed to initiate OAuth flow');
+                }
+            } catch (error) {
+                console.error('💥 OAuth login error:', error);
+                console.error('📍 Error stack:', error.stack);
+                displayResult({ 
+                    error: error.message,
+                    troubleshooting: 'Check browser console for detailed error information'
+                }, false);
+                hideLoading(oauthSpinner, oauthLoginBtn);
+            }
+        });
+
+        // Handle OAuth callback result
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const authResult = urlParams.get('auth');
+            const error = urlParams.get('error');
+            
+            if (authResult === 'success') {
+                updateConnectionStatus(true);
+                displayResult({ 
+                    message: '🎉 OAuth authentication successful!',
+                    flow: 'Authorization Code',
+                    timestamp: new Date().toISOString()
+                });
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (error) {
+                displayResult({ 
+                    error: decodeURIComponent(error),
+                    troubleshooting: 'Check your Connected App configuration and try again.'
+                }, false);
+                updateConnectionStatus(false);
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                // Check authentication status on page load
+                await checkAuthStatus();
+            }
+        });
+
+        // Check Authentication Status
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`);
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    updateConnectionStatus(true);
+                    displayResult({
+                        message: 'Already authenticated',
+                        instanceUrl: data.instanceUrl,
+                        hasRefreshToken: data.hasRefreshToken
+                    });
+                }
+            } catch (error) {
+                console.log('Status check failed:', error);
+            }
+        }
+
+        // Manual Status Check
+        statusBtn.addEventListener('click', async () => {
+            showLoading(statusSpinner, statusBtn);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`);
+                const data = await response.json();
+                
+                displayResult({
+                    authenticated: data.authenticated,
+                    instanceUrl: data.instanceUrl,
+                    hasRefreshToken: data.hasRefreshToken
+                });
+                
+                updateConnectionStatus(data.authenticated);
+            } catch (error) {
+                displayResult({ error: error.message }, false);
+            } finally {
+                hideLoading(statusSpinner, statusBtn);
+            }
+        });
+
+        // Token Refresh
+        refreshTokenBtn.addEventListener('click', async () => {
+            showLoading(refreshSpinner, refreshTokenBtn);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResult(data);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                displayResult({ error: error.message }, false);
+            } finally {
+                hideLoading(refreshSpinner, refreshTokenBtn);
+            }
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+                const data = await response.json();
+                
+                updateConnectionStatus(false);
+                displayResult(data);
+            } catch (error) {
+                displayResult({ error: error.message }, false);
+            }
+        });
+
+        // Switch to Password Flow
+        switchToPasswordBtn.addEventListener('click', () => {
+            window.location.href = '/salesforce-test-proxy.html';
+        });
+
+    </script>
+</body>
+</html>
