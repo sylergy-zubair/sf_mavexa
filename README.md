@@ -9,7 +9,10 @@ A comprehensive Node.js application for testing Salesforce API integration with 
 - **Username/Password Flow** (Legacy) - Simple authentication for testing
 
 ### API Operations
-- Create, Read, Update, Delete operations on Salesforce objects
+- **Complete Contact CRUD Operations** - Create, Read, Update, Delete contacts
+- **Contact Management Interface** - Tabbed interface for all contact operations
+- **Contact Search** - Search contacts using Salesforce SOSL
+- **Bulk Operations** - Create, update, or delete multiple contacts
 - Lead management
 - Account management
 - Custom object support
@@ -98,16 +101,15 @@ A comprehensive Node.js application for testing Salesforce API integration with 
 
 ## 📱 User Interface
 
-### OAuth Interface (`/oauth`)
-- Modern OAuth 2.0 authentication flow
-- Token refresh functionality
-- Authentication status checking
-- Security comparison table
-
-### Password Interface (`/password`)
-- Traditional credential form
-- Direct username/password authentication
-- Link to try OAuth flow
+### Main Interface (`/`)
+- **OAuth 2.0 Authentication** - Secure login with Salesforce
+- **Contact Management** - Complete CRUD interface with tabs:
+  - **➕ Create** - Create new contacts with form validation
+  - **📋 List** - View all contacts with pagination and sorting
+  - **🔍 Search** - Search contacts by name, email, or other terms
+  - **✏️ Edit** - Edit and delete contacts (appears when contact is selected)
+- **Real-time Updates** - Lists refresh automatically after operations
+- **Responsive Design** - Works on desktop and mobile devices
 
 ## 🔧 API Endpoints
 
@@ -121,7 +123,17 @@ A comprehensive Node.js application for testing Salesforce API integration with 
 ### Legacy Endpoints
 - `POST /api/sf/authenticate` - Username/Password authentication
 
-### Salesforce API Endpoints
+### Contact CRUD Endpoints
+- `POST /api/sf/contacts` - Create new contact
+- `GET /api/sf/contacts/:id` - Get contact by ID
+- `GET /api/sf/contacts` - List contacts with pagination and sorting
+- `GET /api/sf/contacts/search` - Search contacts using SOSL
+- `PUT /api/sf/contacts/:id` - Update contact (full update)
+- `PATCH /api/sf/contacts/:id` - Partial update contact
+- `DELETE /api/sf/contacts/:id` - Delete contact
+- `POST /api/sf/contacts/bulk` - Bulk operations (create, update, delete)
+
+### Legacy Salesforce Endpoints
 - `POST /api/sf/leads` - Create lead
 - `GET /api/sf/leads` - Get recent leads
 - `GET /api/sf/accounts` - Get recent accounts
@@ -156,19 +168,20 @@ A comprehensive Node.js application for testing Salesforce API integration with 
 ## 🧪 Testing
 
 ### Manual Testing
-1. **OAuth Flow**:
+1. **Complete Contact Management**:
    ```bash
-   # Start server and navigate to OAuth interface
+   # Start server
    npm start
-   # Open http://localhost:3000/oauth
+   # Open http://localhost:3000
+   # Login with Salesforce OAuth
+   # Test all Contact CRUD operations
    ```
 
-2. **Password Flow**:
-   ```bash
-   # Start server and navigate to password interface
-   npm start
-   # Open http://localhost:3000/password
-   ```
+2. **Contact Operations Testing**:
+   - **Create**: Use ➕ Create tab to add new contacts
+   - **List**: Use 📋 List tab to view all contacts
+   - **Search**: Use 🔍 Search tab to find specific contacts
+   - **Edit**: Click any contact in the list to edit or delete
 
 ### Environment Testing
 ```bash
@@ -268,7 +281,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📊 Implementation Status
 
 - ✅ OAuth 2.0 Authorization Code Flow
-- ✅ Username/Password Flow (Legacy)
+- ✅ Complete Contact CRUD Operations
+- ✅ Contact Management Interface (Create, List, Search, Edit, Delete)
+- ✅ Contact Search with SOSL
+- ✅ Bulk Contact Operations
+- ✅ Real-time List Updates
+- ✅ Form Validation and Error Handling
+- ✅ Responsive Design (Mobile & Desktop)
 - ✅ Token Refresh Mechanism
 - ✅ CSRF Protection
 - ✅ Session Management
@@ -276,5 +295,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - ⏳ Production Deployment Guide
 - ⏳ Automated Testing Suite
 
-**Current Version**: 2.0.0 (OAuth Implementation)  
-**Last Updated**: [Current Date]
+**Current Version**: 3.0.0 (Contact CRUD Implementation)  
+**Last Updated**: July 24, 2025

@@ -72,6 +72,7 @@ This document provides a comprehensive visual guide to the OAuth 2.0 Authorizati
          │                       │                       │
          │ ⑭  Success Redirect   │                       │
          │    /?auth=success     │                       │
+  
          │◄──────────────────────┤                       │
          │                       │                       │
          │ ⑮  Update UI State    │                       │
@@ -170,7 +171,7 @@ Content-Type: application/json
 
 {
   "success": true,
-  "authUrl": "https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=YOUR_CONSUMER_KEY_HERE&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fsf%2Fauth%2Fcallback&scope=api+refresh_token+id&state=a1b2c3d4e5f6789012345678901234567890abcdef&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256",
+  "authUrl": "https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=3MVG9rZjd7MXFdLhNnqPSnyopnvKGBa49SeoCwMDiqD3Mt94YLYTb2IshDlv9bxJpd1U03AakVVCdC4_DdNeG&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fsf%2Fauth%2Fcallback&scope=api+refresh_token+id&state=a1b2c3d4e5f6789012345678901234567890abcdef&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256",
   "message": "Redirect user to this URL for authentication"
 }
 ```
@@ -180,7 +181,7 @@ Content-Type: application/json
 Base URL: https://login.salesforce.com/services/oauth2/authorize
 Parameters:
 ├── response_type: code
-├── client_id: YOUR_CONSUMER_KEY_HERE
+├── client_id: 3MVG9rZjd7MXFdLhNnqPSnyopnvKGBa49SeoCwMDiqD3Mt94YLYTb2IshDlv9bxJpd1U03AakVVCdC4_DdNeG
 ├── redirect_uri: http://localhost:3000/api/sf/auth/callback
 ├── scope: api refresh_token id
 ├── state: a1b2c3d4e5f6789012345678901234567890abcdef
@@ -253,7 +254,7 @@ Status: ❌ Disconnected (transitioning...)
 ```
 https://login.salesforce.com/services/oauth2/authorize?
 response_type=code&
-client_id=YOUR_CONSUMER_KEY_HERE&
+client_id=3MVG9rZjd7MXFdLhNnqPSnyopnvKGBa49SeoCwMDiqD3Mt94YLYTb2IshDlv9bxJpd1U03AakVVCdC4_DdNeG&
 redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fsf%2Fauth%2Fcallback&
 scope=api+refresh_token+id&
 state=a1b2c3d4e5f6789012345678901234567890abcdef&
@@ -830,7 +831,7 @@ Open your browser to: http://localhost:3000
 
 # User clicks "Login with Salesforce"
 === OAuth Authorization Flow Initiated ===
-Auth URL generated: https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=YOUR_CONSUMER_KEY_HERE&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fsf%2Fauth%2Fcallback&scope=api+refresh_token+id&state=a1b2c3d4e5f6789012345678901234567890abcdef&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256
+Auth URL generated: https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=3MVG9rZjd7MXFdLhNnqPSnyopnvKGBa49SeoCwMDiqD3Mt94YLYTb2IshDlv9bxJpd1U03AakVVCdC4_DdNeG&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fsf%2Fauth%2Fcallback&scope=api+refresh_token+id&state=a1b2c3d4e5f6789012345678901234567890abcdef&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256
 State parameter: a1b2c3d4e5f6789012345678901234567890abcdef
 
 # User completes Salesforce authentication

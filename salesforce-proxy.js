@@ -412,6 +412,541 @@ app.post('/api/sf/auth/logout', (req, res) => {
 });
 
 // =============================================================================
+// Contact CRUD API Endpoints  
+// =============================================================================
+
+// Helper function for making authenticated Salesforce API calls
+async function makeAuthenticatedRequest(url, options = {}) {
+    if (!accessToken) {
+        throw new Error('Not authenticated with Salesforce');
+    }
+    
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
+    });
+    
+    let data = null;
+    
+    // Get response text first to avoid JSON parsing errors
+    const responseText = await response.text();
+    
+    // Only try to parse JSON if there's actual content
+    if (responseText && responseText.trim().length > 0) {
+        try {
+            data = JSON.parse(responseText);
+        } catch (jsonError) {
+            console.log('⚠️ Response is not JSON:', responseText);
+            // For non-JSON responses, just store the text
+            data = { rawResponse: responseText };
+        }
+    }
+    
+    if (!response.ok) {
+        const errorMessage = data?.[0]?.message || data?.message || data?.rawResponse || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
+    }
+    
+    return { response, data };
+}
+
+// Create Contact
+app.post('/api/sf/contacts', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const contactData = req.body;
+        console.log('\n=== Creating Contact ===');
+        console.log('Contact data:', JSON.stringify(contactData, null, 2));
+
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/sobjects/Contact`,
+            {
+                method: 'POST',
+                body: JSON.stringify(contactData)
+            }
+        );
+
+        console.log('✅ Contact created successfully:', data.id);
+
+        res.status(201).json({
+            id: data.id,
+            success: true,
+            created: true
+        });
+
+    } catch (error) {
+        console.error('❌ Create contact error:', error);
+        
+        if (error.message.includes('REQUIRED_FIELD_MISSING')) {
+            return res.status(400).json({
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: 'Required fields are missing',
+                    details: {
+                        fields: [{ field: 'LastName', message: 'Last name is required' }]
+                    }
+                }
+            });
+        }
+        
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// Get Contact by ID
+app.get('/api/sf/contacts/:id', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const contactId = req.params.id;
+        console.log('\n=== Getting Contact by ID ===');
+        console.log('Contact ID:', contactId);
+
+        const fields = 'Id,FirstName,LastName,Email,Phone,Title,Department,AccountId,CreatedDate,LastModifiedDate';
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/sobjects/Contact/${contactId}?fields=${fields}`
+        );
+
+        console.log('✅ Contact retrieved successfully');
+        res.json(data);
+
+    } catch (error) {
+        console.error('❌ Get contact error:', error);
+        
+        if (error.message.includes('NOT_FOUND')) {
+            return res.status(404).json({
+                error: {
+                    code: 'NOT_FOUND',
+                    message: 'Contact not found',
+                    details: {
+                        contactId: req.params.id
+                    }
+                }
+            });
+        }
+        
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// List Contacts with pagination
+app.get('/api/sf/contacts', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = parseInt(req.query.offset) || 0;
+        const orderBy = req.query.orderBy || 'LastModifiedDate';
+        const order = req.query.order || 'DESC';
+
+        console.log('\n=== Listing Contacts ===');
+        console.log(`Limit: ${limit}, Offset: ${offset}, OrderBy: ${orderBy} ${order}`);
+
+        const query = `SELECT Id,FirstName,LastName,Email,Phone,Title,Department,CreatedDate,LastModifiedDate FROM Contact ORDER BY ${orderBy} ${order} LIMIT ${limit} OFFSET ${offset}`;
+        
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/query?q=${encodeURIComponent(query)}`
+        );
+
+        console.log(`✅ Retrieved ${data.records.length} contacts`);
+
+        res.json({
+            totalSize: data.totalSize,
+            done: data.done,
+            nextRecordsUrl: data.nextRecordsUrl ? `/api/sf/contacts?limit=${limit}&offset=${offset + limit}` : null,
+            records: data.records
+        });
+
+    } catch (error) {
+        console.error('❌ List contacts error:', error);
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// Search Contacts  
+app.get('/api/sf/contacts/search', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const searchQuery = req.query.q;
+        const fields = req.query.fields || 'Id,FirstName,LastName,Email,Phone,Title';
+        const limit = parseInt(req.query.limit) || 20;
+
+        if (!searchQuery) {
+            return res.status(400).json({
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: 'Search query parameter "q" is required'
+                }
+            });
+        }
+
+        console.log('\n=== Searching Contacts ===');
+        console.log(`Query: "${searchQuery}", Fields: ${fields}, Limit: ${limit}`);
+
+        const sosl = `FIND {${searchQuery}} IN NAME FIELDS RETURNING Contact(${fields}) LIMIT ${limit}`;
+        
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/search?q=${encodeURIComponent(sosl)}`
+        );
+
+        const contacts = data.searchRecords || [];
+        console.log(`✅ Found ${contacts.length} contacts`);
+
+        res.json({
+            searchRecords: contacts
+        });
+
+    } catch (error) {
+        console.error('❌ Search contacts error:', error);
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// Update Contact (full update)
+app.put('/api/sf/contacts/:id', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const contactId = req.params.id;
+        const updateData = req.body;
+        
+        console.log('\n=== Updating Contact (Full) ===');
+        console.log('Contact ID:', contactId);
+        console.log('Update data:', JSON.stringify(updateData, null, 2));
+
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/sobjects/Contact/${contactId}`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify(updateData)
+            }
+        );
+
+        console.log('✅ Contact updated successfully');
+
+        res.json({
+            id: contactId,
+            success: true
+        });
+
+    } catch (error) {
+        console.error('❌ Update contact error:', error);
+        
+        if (error.message.includes('NOT_FOUND')) {
+            return res.status(404).json({
+                error: {
+                    code: 'NOT_FOUND',
+                    message: 'Contact not found',
+                    details: {
+                        contactId: req.params.id
+                    }
+                }
+            });
+        }
+        
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// Partial Update Contact
+app.patch('/api/sf/contacts/:id', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const contactId = req.params.id;
+        const updateData = req.body;
+        const updatedFields = Object.keys(updateData);
+        
+        console.log('\n=== Updating Contact (Partial) ===');
+        console.log('Contact ID:', contactId);
+        console.log('Updated fields:', updatedFields);
+        console.log('Update data:', JSON.stringify(updateData, null, 2));
+
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/sobjects/Contact/${contactId}`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify(updateData)
+            }
+        );
+
+        console.log('✅ Contact partially updated successfully');
+
+        res.json({
+            id: contactId,
+            success: true,
+            updated: updatedFields
+        });
+
+    } catch (error) {
+        console.error('❌ Partial update contact error:', error);
+        
+        if (error.message.includes('NOT_FOUND')) {
+            return res.status(404).json({
+                error: {
+                    code: 'NOT_FOUND',
+                    message: 'Contact not found',
+                    details: {
+                        contactId: req.params.id
+                    }
+                }
+            });
+        }
+        
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// Delete Contact
+app.delete('/api/sf/contacts/:id', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const contactId = req.params.id;
+        console.log('\n=== Deleting Contact ===');
+        console.log('Contact ID:', contactId);
+
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/sobjects/Contact/${contactId}`,
+            {
+                method: 'DELETE'
+            }
+        );
+
+        console.log('✅ Contact deleted successfully');
+
+        res.status(204).send();
+
+    } catch (error) {
+        console.error('❌ Delete contact error:', error);
+        
+        if (error.message.includes('NOT_FOUND')) {
+            return res.status(404).json({
+                error: {
+                    code: 'NOT_FOUND',
+                    message: 'Contact not found',
+                    details: {
+                        contactId: req.params.id
+                    }
+                }
+            });
+        }
+        
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// Bulk Operations
+app.post('/api/sf/contacts/bulk', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        const { operation, records, ids } = req.body;
+        
+        console.log('\n=== Bulk Contact Operation ===');
+        console.log('Operation:', operation);
+        console.log('Records count:', records?.length || ids?.length || 0);
+
+        let results = [];
+        let hasErrors = false;
+
+        if (operation === 'create' && records) {
+            // Bulk create
+            for (const record of records) {
+                try {
+                    const { response, data } = await makeAuthenticatedRequest(
+                        `${instanceUrl}/services/data/v58.0/sobjects/Contact`,
+                        {
+                            method: 'POST',
+                            body: JSON.stringify(record)
+                        }
+                    );
+                    results.push({
+                        id: data.id,
+                        success: true,
+                        created: true
+                    });
+                } catch (error) {
+                    hasErrors = true;
+                    results.push({
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+        } else if (operation === 'update' && records) {
+            // Bulk update
+            for (const record of records) {
+                try {
+                    const { Id, ...updateData } = record;
+                    const { response, data } = await makeAuthenticatedRequest(
+                        `${instanceUrl}/services/data/v58.0/sobjects/Contact/${Id}`,
+                        {
+                            method: 'PATCH',
+                            body: JSON.stringify(updateData)
+                        }
+                    );
+                    results.push({
+                        id: Id,
+                        success: true
+                    });
+                } catch (error) {
+                    hasErrors = true;
+                    results.push({
+                        id: record.Id,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+        } else if (operation === 'delete' && ids) {
+            // Bulk delete
+            for (const id of ids) {
+                try {
+                    const { response, data } = await makeAuthenticatedRequest(
+                        `${instanceUrl}/services/data/v58.0/sobjects/Contact/${id}`,
+                        {
+                            method: 'DELETE'
+                        }
+                    );
+                    results.push({
+                        id: id,
+                        success: true
+                    });
+                } catch (error) {
+                    hasErrors = true;
+                    results.push({
+                        id: id,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+        } else {
+            return res.status(400).json({
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: 'Invalid bulk operation or missing data'
+                }
+            });
+        }
+
+        console.log(`✅ Bulk ${operation} completed. Success: ${results.filter(r => r.success).length}, Errors: ${results.filter(r => !r.success).length}`);
+
+        res.json({
+            hasErrors: hasErrors,
+            results: results
+        });
+
+    } catch (error) {
+        console.error('❌ Bulk operation error:', error);
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
+// =============================================================================
 // Existing API Endpoints (unchanged)
 // =============================================================================
 
