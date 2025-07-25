@@ -11,12 +11,24 @@ This document provides comprehensive API documentation for the Salesforce techni
 
 ## Authentication
 
-All API endpoints require proper Salesforce authentication. The system supports multiple OAuth 2.0 flows.
+The system supports multiple authentication approaches:
+1. **JWT Backend Authentication** (Recommended for enterprise)
+2. **Legacy OAuth 2.0** (Current implementation)
 
 ### Authentication Headers
+
+#### JWT Backend Mode
 ```http
-Authorization: Bearer <access_token>
+Authorization: Bearer <jwt_token>
 Content-Type: application/json
+X-Auth-Type: jwt
+```
+
+#### Legacy OAuth Mode
+```http
+Authorization: Bearer <salesforce_access_token>
+Content-Type: application/json
+X-Auth-Type: legacy
 ```
 
 ---
@@ -44,8 +56,13 @@ GET /api/sf/auth/login
 GET /api/sf/auth/callback?code=...&state=...
 ```
 
-**Success:** Redirects to `/?auth=success`
-**Error:** Redirects to `/?error=error_description`
+**JWT Backend Mode:**
+- Success: Redirects to `/?auth=success&type=jwt`
+- Error: Redirects to `/?error=error_description`
+
+**Legacy OAuth Mode:**
+- Success: Redirects to `/?auth=success&type=legacy`
+- Error: Redirects to `/?error=error_description`
 
 #### 1.3 Token Refresh
 ```http
@@ -65,12 +82,37 @@ POST /api/sf/auth/refresh
 GET /api/sf/auth/status
 ```
 
-**Response:**
+**JWT Backend Mode Response:**
 ```json
 {
   "authenticated": true,
+  "authType": "jwt",
   "hasRefreshToken": true,
-  "instanceUrl": "https://xxx.my.salesforce.com"
+  "instanceUrl": "https://xxx.my.salesforce.com",
+  "userProfile": {
+    "id": "005U0000001ABCD",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "organizationId": "012345678912345",
+    "permissions": ["api", "contact_crud"]
+  },
+  "tokenExpiry": "2025-01-25T11:30:00Z",
+  "jwtFlow": true,
+  "legacyEnabled": false
+}
+```
+
+**Legacy OAuth Mode Response:**
+```json
+{
+  "authenticated": true,
+  "authType": "legacy",
+  "hasRefreshToken": true,
+  "instanceUrl": "https://xxx.my.salesforce.com",
+  "userProfile": null,
+  "tokenExpiry": null,
+  "jwtFlow": false,
+  "legacyEnabled": true
 }
 ```
 
