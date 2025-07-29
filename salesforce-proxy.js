@@ -397,6 +397,75 @@ app.get('/api/sf/auth/status', (req, res) => {
     });
 });
 
+// Get Current User Info
+app.get('/api/sf/auth/user', async (req, res) => {
+    try {
+        if (!accessToken) {
+            return res.status(401).json({
+                error: {
+                    code: 'AUTHENTICATION_REQUIRED',
+                    message: 'Not authenticated with Salesforce'
+                }
+            });
+        }
+
+        console.log('\n=== Getting Current User Info ===');
+        
+        const { response, data } = await makeAuthenticatedRequest(
+            `${instanceUrl}/services/data/v58.0/sobjects/User/${accessToken.split('!')[0]}`
+        );
+
+        // Alternative approach using identity endpoint
+        if (!response.ok) {
+            const identityUrl = `${instanceUrl}/services/oauth2/userinfo`;
+            const identityResponse = await makeAuthenticatedRequest(identityUrl);
+            
+            if (identityResponse.response.ok) {
+                return res.json({
+                    userId: identityResponse.data.user_id,
+                    username: identityResponse.data.preferred_username,
+                    email: identityResponse.data.email,
+                    name: identityResponse.data.name
+                });
+            }
+        }
+
+        console.log('✅ User info retrieved successfully');
+        res.json({
+            userId: data.Id,
+            username: data.Username,
+            email: data.Email,
+            name: data.Name,
+            firstName: data.FirstName,
+            lastName: data.LastName
+        });
+
+    } catch (error) {
+        console.error('❌ Get user info error:', error);
+        
+        // Fallback: extract user ID from access token if possible
+        try {
+            const tokenParts = accessToken.split('!');
+            if (tokenParts.length > 0) {
+                const userId = tokenParts[0];
+                return res.json({
+                    userId: userId,
+                    message: 'User ID extracted from token (limited info available)'
+                });
+            }
+        } catch (tokenError) {
+            console.error('❌ Token parsing failed:', tokenError);
+        }
+        
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: error.message
+            }
+        });
+    }
+});
+
 // OAuth Logout
 app.post('/api/sf/auth/logout', (req, res) => {
     accessToken = null;
@@ -467,6 +536,15 @@ app.post('/api/sf/contacts', async (req, res) => {
         }
 
         const contactData = req.body;
+        
+        // Add tracking marker to identify contacts created through this app
+        const appCreatedMarker = '[SF-APP-CREATED]';
+        if (contactData.Description) {
+            contactData.Description = `${appCreatedMarker} ${contactData.Description}`;
+        } else {
+            contactData.Description = appCreatedMarker;
+        }
+        
         console.log('\n=== Creating Contact ===');
         console.log('Contact data:', JSON.stringify(contactData, null, 2));
 
@@ -574,23 +652,73 @@ app.get('/api/sf/contacts', async (req, res) => {
         const offset = parseInt(req.query.offset) || 0;
         const orderBy = req.query.orderBy || 'LastModifiedDate';
         const order = req.query.order || 'DESC';
+        const myContactsOnly = req.query.myContactsOnly === 'true';
+        const appCreatedOnly = req.query.appCreatedOnly === 'true';
 
         console.log('\n=== Listing Contacts ===');
-        console.log(`Limit: ${limit}, Offset: ${offset}, OrderBy: ${orderBy} ${order}`);
+        console.log(`Limit: ${limit}, Offset: ${offset}, OrderBy: ${orderBy} ${order}, MyContactsOnly: ${myContactsOnly}, AppCreatedOnly: ${appCreatedOnly}`);
 
-        const query = `SELECT Id,FirstName,LastName,Email,Phone,Title,Department,CreatedDate,LastModifiedDate FROM Contact ORDER BY ${orderBy} ${order} LIMIT ${limit} OFFSET ${offset}`;
+        let query = 'SELECT Id,FirstName,LastName,Email,Phone,Title,Department,Description,OwnerId,CreatedDate,LastModifiedDate FROM Contact';
+        let whereConditions = [];
+        
+        // Add owner filter if requested
+        if (myContactsOnly) {
+            try {
+                // Get current user ID using userinfo endpoint
+                const userInfoResponse = await makeAuthenticatedRequest(
+                    `${instanceUrl}/services/oauth2/userinfo`
+                );
+                
+                if (userInfoResponse.response.ok) {
+                    const currentUserId = userInfoResponse.data.user_id;
+                    whereConditions.push(`OwnerId = '${currentUserId}'`);
+                    console.log(`🔍 Filtering contacts by OwnerId: ${currentUserId}`);
+                } else {
+                    console.warn('⚠️ Could not get user ID, showing all contacts');
+                }
+            } catch (userError) {
+                console.warn('⚠️ Failed to get user ID for filtering, showing all contacts:', userError.message);
+            }
+        }
+        
+        // Add app-created filter if requested
+        if (appCreatedOnly) {
+            whereConditions.push(`Description LIKE '%[SF-APP-CREATED]%'`);
+            console.log('🔍 Filtering contacts created through this app');
+        }
+        
+        // Add WHERE clause if any conditions exist
+        if (whereConditions.length > 0) {
+            query += ` WHERE ${whereConditions.join(' AND ')}`;
+        }
+        
+        query += ` ORDER BY ${orderBy} ${order} LIMIT ${limit} OFFSET ${offset}`;
         
         const { response, data } = await makeAuthenticatedRequest(
             `${instanceUrl}/services/data/v58.0/query?q=${encodeURIComponent(query)}`
         );
 
-        console.log(`✅ Retrieved ${data.records.length} contacts`);
+        let filterMsg = '';
+        if (myContactsOnly && appCreatedOnly) {
+            filterMsg = ' (filtered by owner and app-created)';
+        } else if (myContactsOnly) {
+            filterMsg = ' (filtered by owner)';
+        } else if (appCreatedOnly) {
+            filterMsg = ' (filtered by app-created)';
+        }
+
+        console.log(`✅ Retrieved ${data.records.length} contacts${filterMsg}`);
 
         res.json({
             totalSize: data.totalSize,
             done: data.done,
-            nextRecordsUrl: data.nextRecordsUrl ? `/api/sf/contacts?limit=${limit}&offset=${offset + limit}` : null,
-            records: data.records
+            nextRecordsUrl: data.nextRecordsUrl ? `/api/sf/contacts?limit=${limit}&offset=${offset + limit}&myContactsOnly=${myContactsOnly}&appCreatedOnly=${appCreatedOnly}` : null,
+            records: data.records,
+            filtered: myContactsOnly || appCreatedOnly,
+            filterType: {
+                myContactsOnly,
+                appCreatedOnly
+            }
         });
 
     } catch (error) {
@@ -851,6 +979,14 @@ app.post('/api/sf/contacts/bulk', async (req, res) => {
             // Bulk create
             for (const record of records) {
                 try {
+                    // Add tracking marker to each record
+                    const appCreatedMarker = '[SF-APP-CREATED]';
+                    if (record.Description) {
+                        record.Description = `${appCreatedMarker} ${record.Description}`;
+                    } else {
+                        record.Description = appCreatedMarker;
+                    }
+                    
                     const { response, data } = await makeAuthenticatedRequest(
                         `${instanceUrl}/services/data/v58.0/sobjects/Contact`,
                         {

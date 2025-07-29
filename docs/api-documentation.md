@@ -2,12 +2,13 @@
 
 ## Overview
 
-This document provides comprehensive API documentation for the Salesforce technical validation system, covering both Node.js proxy server and Go implementation endpoints.
+This document provides comprehensive API documentation for the CRM integration system, covering both Salesforce and HubSpot integrations via the Node.js proxy server.
 
 ## Base URLs
 
 - **Node.js Server**: `http://localhost:3000`
-- **Go Server**: `http://localhost:8080`
+- **Salesforce API**: See [salesforce/salesforce-api-specification.md](./salesforce/salesforce-api-specification.md)
+- **HubSpot API**: See [hubspot/hubspot-api-specification.md](./hubspot/hubspot-api-specification.md)
 
 ## Authentication
 

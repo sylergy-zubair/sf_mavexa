@@ -3,9 +3,10 @@
 ## System Architecture
 
 ### Overview
-The Salesforce technical validation system consists of two parallel implementations:
-1. **Node.js/Express Proxy Server** - Enhanced existing implementation
-2. **Go Application** - New implementation for comparison
+The CRM integration system provides unified access to multiple CRM platforms:
+1. **Node.js/Express Proxy Server** - Main application server
+2. **Salesforce Integration** - OAuth 2.0 + REST API integration  
+3. **HubSpot Integration** - OAuth 2.0 + REST API integration
 
 ### Architecture Diagram
 ```
@@ -16,8 +17,8 @@ The Salesforce technical validation system consists of two parallel implementati
                                 │
                                 ▼
                        ┌─────────────────┐
-                       │   Go SDK/REST   │
-                       │  Implementation │
+                       │     HubSpot     │
+                       │   CRM via API   │
                        └─────────────────┘
 ```
 
@@ -250,349 +251,25 @@ Rate Limit Response (429):
 
 ---
 
-## Go Implementation Specifications
+## HubSpot Integration Specifications
 
-### Project Structure
+### HubSpot API Configuration
+- **Base URL**: `https://api.hubapi.com`
+- **OAuth URL**: `https://app.hubspot.com/oauth/authorize`
+- **API Version**: v3 (Contacts API)
+- **Authentication**: OAuth 2.0 Authorization Code flow
+
+### Required Scopes
 ```
-go-salesforce/
-├── cmd/
-│   └── main.go
-├── pkg/
-│   ├── auth/
-│   │   ├── oauth.go
-│   │   ├── session.go
-│   │   └── types.go
-│   ├── contacts/
-│   │   ├── crud.go
-│   │   ├── models.go
-│   │   └── service.go
-│   ├── api/
-│   │   ├── rest_client.go
-│   │   ├── sdk_client.go
-│   │   └── interface.go
-│   ├── benchmarks/
-│   │   ├── performance.go
-│   │   └── comparison.go
-│   └── common/
-│       ├── errors.go
-│       ├── config.go
-│       └── logging.go
-├── tests/
-│   ├── integration/
-│   └── benchmarks/
-├── docs/
-├── go.mod
-└── go.sum
+crm.objects.contacts.read
+crm.objects.contacts.write  
+oauth
 ```
 
-### Dependencies
-```go
-require (
-    github.com/go-resty/resty/v2 v2.7.0
-    github.com/golang-jwt/jwt/v4 v4.5.0
-    github.com/gorilla/mux v1.8.0
-    github.com/joho/godotenv v1.4.0
-    github.com/stretchr/testify v1.8.4
-)
+### Environment Variables
+```bash
+HS_CLIENT_ID=your_hubspot_client_id
+HS_CLIENT_SECRET=your_hubspot_client_secret
+HS_REDIRECT_URI=http://localhost:3000/api/hs/auth/callback
+HS_SCOPE=crm.objects.contacts.read crm.objects.contacts.write oauth
 ```
-
-### Data Models
-
-#### Authentication
-```go
-type AuthConfig struct {
-    InstanceURL  string `json:"instanceUrl"`
-    ClientID     string `json:"clientId"`
-    ClientSecret string `json:"clientSecret"`
-    Username     string `json:"username"`
-    Password     string `json:"password"`
-}
-
-type AuthResponse struct {
-    AccessToken  string `json:"access_token"`
-    RefreshToken string `json:"refresh_token"`
-    InstanceURL  string `json:"instance_url"`
-    TokenType    string `json:"token_type"`
-    ExpiresIn    int    `json:"expires_in"`
-}
-
-type Session struct {
-    AccessToken  string
-    RefreshToken string
-    InstanceURL  string
-    ExpiresAt    time.Time
-    ClientID     string
-    ClientSecret string
-}
-```
-
-#### Contact Model
-```go
-type Contact struct {
-    ID               string    `json:"Id,omitempty"`
-    FirstName        string    `json:"FirstName"`
-    LastName         string    `json:"LastName"`
-    Email            string    `json:"Email"`
-    Phone            string    `json:"Phone,omitempty"`
-    Title            string    `json:"Title,omitempty"`
-    Department       string    `json:"Department,omitempty"`
-    AccountID        string    `json:"AccountId,omitempty"`
-    CreatedDate      time.Time `json:"CreatedDate,omitempty"`
-    LastModifiedDate time.Time `json:"LastModifiedDate,omitempty"`
-}
-
-type ContactResponse struct {
-    ID      string `json:"id"`
-    Success bool   `json:"success"`
-    Created bool   `json:"created,omitempty"`
-    Errors  []struct {
-        Message string `json:"message"`
-        Fields  []string `json:"fields"`
-    } `json:"errors,omitempty"`
-}
-
-type ContactListResponse struct {
-    TotalSize        int       `json:"totalSize"`
-    Done             bool      `json:"done"`
-    NextRecordsURL   string    `json:"nextRecordsUrl,omitempty"`
-    Records          []Contact `json:"records"`
-}
-```
-
-### Interface Definitions
-
-#### API Client Interface
-```go
-type SalesforceClient interface {
-    Authenticate(config AuthConfig) (*Session, error)
-    RefreshToken(session *Session) error
-    
-    CreateContact(session *Session, contact Contact) (*ContactResponse, error)
-    GetContact(session *Session, id string) (*Contact, error)
-    UpdateContact(session *Session, id string, contact Contact) (*ContactResponse, error)
-    DeleteContact(session *Session, id string) error
-    ListContacts(session *Session, limit, offset int) (*ContactListResponse, error)
-    SearchContacts(session *Session, query string, fields []string) (*ContactListResponse, error)
-}
-```
-
-#### Performance Benchmarking
-```go
-type BenchmarkResult struct {
-    Operation     string        `json:"operation"`
-    Implementation string       `json:"implementation"`
-    RequestCount  int           `json:"requestCount"`
-    Duration      time.Duration `json:"duration"`
-    AvgLatency    time.Duration `json:"avgLatency"`
-    MinLatency    time.Duration `json:"minLatency"`
-    MaxLatency    time.Duration `json:"maxLatency"`
-    ErrorCount    int           `json:"errorCount"`
-    MemoryUsage   int64         `json:"memoryUsage"`
-}
-
-type ComparisonReport struct {
-    TestDate    time.Time         `json:"testDate"`
-    Environment string           `json:"environment"`
-    Results     []BenchmarkResult `json:"results"`
-    Summary     struct {
-        Winner         string `json:"winner"`
-        Performance    string `json:"performance"`
-        MemoryUsage    string `json:"memoryUsage"`
-        Maintainability string `json:"maintainability"`
-    } `json:"summary"`
-}
-```
-
----
-
-## Database & Storage Specifications
-
-### Session Management
-- **Node.js**: In-memory storage with Redis option for production
-- **Go**: In-memory with configurable persistence
-
-### Configuration Management
-```javascript
-// Node.js - .env
-SALESFORCE_INSTANCE_URL=https://xxx.my.salesforce.com
-SALESFORCE_CLIENT_ID=3MVG9...
-SALESFORCE_CLIENT_SECRET=xxxxx
-SALESFORCE_USERNAME=user@example.com
-SALESFORCE_PASSWORD=password123
-SERVER_PORT=3000
-REDIS_URL=redis://localhost:6379
-LOG_LEVEL=info
-```
-
-```go
-// Go - config.yaml
-salesforce:
-  instanceUrl: "https://xxx.my.salesforce.com"
-  clientId: "3MVG9..."
-  clientSecret: "xxxxx"
-  username: "user@example.com"
-  password: "password123"
-
-server:
-  port: 8080
-  timeout: 30s
-
-logging:
-  level: "info"
-  format: "json"
-
-performance:
-  maxConcurrentRequests: 100
-  timeoutDuration: "30s"
-```
-
----
-
-## Security Specifications
-
-### Token Security
-- **Storage**: Encrypted in-memory storage
-- **Transmission**: HTTPS only
-- **Rotation**: Automatic refresh token rotation
-- **Expiration**: Token expiration enforcement
-
-### API Security
-- **CORS**: Configurable CORS policies
-- **Rate Limiting**: Configurable rate limits per endpoint
-- **Input Validation**: Comprehensive input sanitization
-- **Error Handling**: No sensitive data in error responses
-
-### Environment Security
-```javascript
-Security Headers:
-- X-Content-Type-Options: nosniff
-- X-Frame-Options: DENY
-- X-XSS-Protection: 1; mode=block
-- Strict-Transport-Security: max-age=31536000
-```
-
----
-
-## Performance Specifications
-
-### Response Time Requirements
-- **Authentication**: < 2 seconds
-- **CRUD Operations**: < 1 second
-- **Bulk Operations**: < 10 seconds (up to 100 records)
-- **Search Operations**: < 3 seconds
-
-### Concurrency Requirements
-- **Node.js**: Support 50 concurrent requests
-- **Go**: Support 100 concurrent requests
-- **Memory Usage**: < 100MB under normal load
-
-### Scalability Targets
-- **Throughput**: 1000 requests/minute
-- **Error Rate**: < 1% under normal conditions
-- **Availability**: 99.9% uptime target
-
----
-
-## Testing Specifications
-
-### Unit Testing
-- **Coverage**: Minimum 80% code coverage
-- **Framework**: Jest (Node.js), Go testing package
-- **Mocking**: Mock external API calls
-
-### Integration Testing
-- **Salesforce Sandbox**: Use developer sandbox for testing
-- **End-to-End**: Full workflow testing
-- **Error Scenarios**: Test all error conditions
-
-### Performance Testing
-- **Load Testing**: Simulate concurrent users
-- **Stress Testing**: Test beyond normal capacity
-- **Memory Testing**: Monitor for memory leaks
-
-### Test Data
-```javascript
-Test Contacts:
-[
-  {
-    "FirstName": "Test",
-    "LastName": "User1",
-    "Email": "test.user1@example.com"
-  },
-  {
-    "FirstName": "Test", 
-    "LastName": "User2",
-    "Email": "test.user2@example.com"
-  }
-]
-```
-
----
-
-## Deployment Specifications
-
-### Environment Requirements
-
-#### Development
-- **Node.js**: v18.x or higher
-- **Go**: v1.21 or higher
-- **Memory**: 2GB minimum
-- **Storage**: 10GB available
-
-#### Production (Recommended)
-- **CPU**: 2 cores minimum
-- **Memory**: 4GB minimum
-- **Storage**: 20GB SSD
-- **Network**: Low latency to Salesforce servers
-
-### Configuration Management
-- **Environment Variables**: All sensitive data
-- **Configuration Files**: Non-sensitive settings
-- **Version Control**: Configuration templates only
-
----
-
-## Monitoring & Logging Specifications
-
-### Logging Requirements
-```javascript
-Log Levels:
-- ERROR: Authentication failures, API errors
-- WARN: Rate limiting, retry attempts
-- INFO: Successful operations, performance metrics
-- DEBUG: Detailed request/response data
-
-Log Format:
-{
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "level": "INFO",
-  "operation": "create_contact",
-  "duration": 234,
-  "status": "success",
-  "requestId": "req_123456789"
-}
-```
-
-### Metrics Collection
-- **Response Times**: P50, P95, P99 percentiles
-- **Error Rates**: By operation and error type
-- **Throughput**: Requests per minute
-- **Resource Usage**: CPU, memory, network
-
----
-
-## API Versioning
-
-### Salesforce API Version
-- **Target Version**: v58.0 (Winter '24)
-- **Fallback Support**: v57.0, v56.0
-- **Version Detection**: Automatic version negotiation
-
-### Internal API Versioning
-- **URL Versioning**: `/api/v1/sf/contacts`
-- **Header Versioning**: `Accept: application/json;version=1`
-- **Backward Compatibility**: Maintain v1 support
-
----
-
-*This document provides the complete technical specifications for the Salesforce technical validation project. All specifications are subject to review and updates based on implementation findings.* 

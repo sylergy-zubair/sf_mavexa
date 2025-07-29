@@ -1,4 +1,4 @@
-# OAuth 2.0 Authorization Code Flow - Visual Guide
+# Salesforce OAuth 2.0 Authorization Code Flow - Visual Guide
 
 ## 🎯 Overview
 

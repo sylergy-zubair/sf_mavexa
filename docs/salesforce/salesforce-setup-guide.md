@@ -1,8 +1,8 @@
-# OAuth Setup Guide
+# Salesforce Setup Guide
 
-## Quick Start Guide for OAuth Implementation
+## Quick Start Guide for Salesforce OAuth Implementation
 
-This guide will help you set up and test the OAuth 2.0 Authorization Code flow implementation in the Salesforce API test tool.
+This guide will help you set up and test the Salesforce OAuth 2.0 Authorization Code flow implementation in the CRM integration tool.
 
 ## Prerequisites
 
